@@ -40,17 +40,17 @@ class CanvasDnD(Canvas):
         self.mesh_step = IntVar(value = mesh_step)
         self.dragging = False
         self.off = None
-        self.canvas.bind("<ButtonPress-1>", self.down, "+")
-        self.canvas.bind("<ButtonRelease-1>", self.up, "+")
-        self.canvas.bind("<Motion>", self.motion, "+")
+        self.bind("<ButtonPress-1>", self.down, "+")
+        self.bind("<ButtonRelease-1>", self.up, "+")
+        self.bind("<Motion>", self.motion, "+")
 
         self.id_priority_sort_function = id_priority_sort_function
 
     def down(self, event):
         x, y = event.widget.canvasx(event.x), event.widget.canvasy(event.y)
 
-        touched = self.canvas.find_overlapping(x - 1, y - 1, x + 1, y + 1)
-        touched = [ t for t in touched if ("DnD" in self.canvas.gettags(t)) ]
+        touched = self.find_overlapping(x - 1, y - 1, x + 1, y + 1)
+        touched = [ t for t in touched if ("DnD" in self.gettags(t)) ]
 
         if not touched:
             return
@@ -71,10 +71,9 @@ class CanvasDnD(Canvas):
             return
 
         self.master.config(cursor = "fleur")
-        c = self.canvas
 
-        xy = c.canvasx(event.x), c.canvasy(event.y)
-        points = c.coords(self.dnd_dragged)
+        xy = self.canvasx(event.x), self.canvasy(event.y)
+        points = self.coords(self.dnd_dragged)
 
         offset = self.off
 
@@ -104,7 +103,7 @@ class CanvasDnD(Canvas):
 
         # print str(points) + " - " + str(self.off)
 
-        tags = c.gettags(self.dnd_dragged)
+        tags = self.gettags(self.dnd_dragged)
 
         if "fixed_x" not in tags:
             for idx in xrange(0, len(points), 2):
@@ -116,7 +115,7 @@ class CanvasDnD(Canvas):
 
         # print points
 
-        c.coords(*([self.dnd_dragged] + points))
+        self.coords(*([self.dnd_dragged] + points))
 
         self.event_generate('<<DnDMoved>>')
 
