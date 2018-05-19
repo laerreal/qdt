@@ -5,9 +5,6 @@ __all__ = [
     "CanvasDnD"
 ]
 
-from .gui_frame import (
-    GUIFrame
-)
 from six.moves import (
     range as xrange
 )
@@ -18,22 +15,26 @@ from six.moves.tkinter import (
     BOTH
 )
 
-class CanvasDnD(GUIFrame):
+class CanvasDnD(Canvas):
     def __init__(self, master,
+            width = 100, height = 100,
+            relief = RIDGE,
+            background = "white",
+            borderwidth = 1,
             id_priority_sort_function = lambda ids : ids,
             mesh_step = 20
         ):
 
-        GUIFrame.__init__ (self, master)
-        self.canvas = Canvas (self,
-            width = 100, # default width
-            height = 100, # default height
-            relief = RIDGE,
-            background = "white",
-            borderwidth = 1
+        Canvas.__init__(self, master,
+            width = width,
+            height = height,
+            relief = relief,
+            background = background,
+            borderwidth = borderwidth
         )
 
-        self.canvas.pack(expand = 1, fill = BOTH)
+        # backward compatibility
+        self.canvas = self
 
         self.align = False
         self.mesh_step = IntVar(value = mesh_step)
