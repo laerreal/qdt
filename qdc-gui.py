@@ -5,6 +5,7 @@ from examples import (
     Q35MachineNode_2_6_0
 )
 from widgets import (
+    set_logo,
     GUIPOp_SetBuildPath,
     TaskErrorDialog,
     Statusbar,
@@ -99,6 +100,8 @@ class ProjectGeneration(CoTask):
 class QDCGUIWindow(GUITk):
     def __init__(self, project = None):
         GUITk.__init__(self, wait_msec = 1)
+
+        set_logo(self)
 
         for signame in [
             "qvc_dirtied",
