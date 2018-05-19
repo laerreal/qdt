@@ -7,7 +7,7 @@ __all__ = [
 from .var_widgets import (
     VarMenu
 )
-from .DnDCanvas import (
+from .canvas_dnd import (
     CanvasDnD
 )
 from six import (
