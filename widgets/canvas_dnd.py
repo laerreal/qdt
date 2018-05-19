@@ -25,7 +25,7 @@ class CanvasDnD(GUIFrame):
         ):
 
         GUIFrame.__init__ (self, master)
-        self.canvas = Canvas (self, 
+        self.canvas = Canvas (self,
             width = 100, # default width
             height = 100, # default height
             relief = RIDGE,
@@ -60,7 +60,7 @@ class CanvasDnD(GUIFrame):
         offset = event.widget.coords(self.dnd_dragged)
         self.off = (x - offset[0], y - offset[1])
 
-        #print str((x,y)) + " - " + str(self.off)
+        # print str((x,y)) + " - " + str(self.off)
 
         self.dragging = True
         self.event_generate('<<DnDDown>>')
@@ -101,7 +101,7 @@ class CanvasDnD(GUIFrame):
             xy[1] - (points[1] + offset[1]) + align_gain[1]
         )
 
-        #print str(points) + " - " + str(self.off)
+        # print str(points) + " - " + str(self.off)
 
         tags = c.gettags(self.dnd_dragged)
 
@@ -113,7 +113,7 @@ class CanvasDnD(GUIFrame):
             for idx in xrange(1, len(points), 2):
                 points[idx] = dxy[1] + points[idx]
 
-        #print points
+        # print points
 
         c.coords(*([self.dnd_dragged] + points))
 
