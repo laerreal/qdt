@@ -32,11 +32,11 @@ with pypath("..ply"):
 
 
 for kw in ["package", "class", "extends", "public", "return", "true", "false",
-    "new", "for"
+    "new", "for", "static", "final", "if", "else"
 ]:
     exec("""\
 def t_%s(t):
-    "%s"
+    "%s(?=\\W)"
     t.tag = "keyword"
     return t
     """ % (kw.upper(), kw))
@@ -62,7 +62,11 @@ t_LT = r"<"
 t_GT = r">"
 t_LE = r"<="
 t_GE = r">="
-t_EQ = r"=="
+
+def t_EQ(t):
+    r"=="
+    return t
+
 t_NE = r"!="
 
 t_PLUS = r'\+'
@@ -76,6 +80,12 @@ t_AND = r'&'
 t_XOR = r'\^'
 t_LSHIFT = r'<<'
 t_RSHIFT = r'>>'
+
+t_LNOT = r'!'
+t_NOT = r'~'
+
+t_LOR = r'\|\|'
+t_LAND = r'&&'
 
 def t_ASSIGN(t):
     "="
@@ -136,6 +146,11 @@ def t_STRING(t):
     t.tag = "string"
     return t
 
+def t_CHAR(t):
+    r"'[a-zA-Z0-9]'"
+    t.tag = "char"
+    return t
+
 def t_COLON(t):
     ":"
     return t
@@ -173,16 +188,40 @@ def p_methods_def(p):
     """ methods_def :
                     | methods_def constructor_def
                     | methods_def method_def
+                    | methods_def field_def
     """
     p[0] = p.slice[1:]
 
 def p_constructor_def(p):
-    """ constructor_def : PUBLIC WORD LBE args_def RBE LB commands RB
+    """ constructor_def : def_spec WORD LBE args_def RBE LB commands RB
     """
     p[0] = p.slice[1:]
 
 def p_method_def(p):
-    """ method_def : WORD WORD LBE args_def RBE LB commands RB
+    """ method_def : def_spec WORD WORD LBE args_def RBE LB commands RB
+    """
+    p[0] = p.slice[1:]
+
+def p_field_def(p):
+    "field_def : def_spec var_decl SC"
+    p[0] = p.slice[1:]
+
+def p_storage(p):
+    """ storage :
+                | FINAL
+                | STATIC
+    """
+    p[0] = p.slice[1:]
+
+def p_access(p):
+    """ access :
+               | PUBLIC
+    """
+    p[0] = p.slice[1:]
+
+def p_def_spec(p):
+    """ def_spec : access storage
+                 | storage access
     """
     p[0] = p.slice[1:]
 
@@ -205,6 +244,7 @@ def p_commands(p):
 
 def p_command(p):
     """ command : for
+                | if
                 | var_decl SC
                 | call SC
                 | return SC
@@ -219,7 +259,7 @@ def p_var_decl(p):
     p[0] = p.slice[1:]
 
 def p_call(p):
-    "call : WORD LBE args_val RBE"
+    "call : dot_expr LBE args_val RBE"
     p[0] = p.slice[1:]
 
 def p_return(p):
@@ -261,6 +301,16 @@ def p_expr(p):
              | expr bitwise expr
              | array_item
              | cast
+             | CHAR
+             | unary_noside
+             | expr logical expr
+    """
+    p[0] = p.slice[1:]
+
+def p_unary_noside(p):
+    """ unary_noside : MINUS expr
+                     | NOT expr
+                     | LNOT expr
     """
     p[0] = p.slice[1:]
 
@@ -282,7 +332,7 @@ def p_array_item(p):
     p[0] = p.slice[1:]
 
 def p_ternary(p):
-    """ ternary : expr cmp expr CONDOP expr COLON expr
+    """ ternary : expr CONDOP expr COLON expr
     """
     p[0] = p.slice[1:]
 
@@ -315,6 +365,12 @@ def p_bitwise(p):
                 | XOR
                 | LSHIFT
                 | RSHIFT
+    """
+    p[0] = p.slice[1:]
+
+def p_logical(p):
+    """ logical : LOR
+                | LAND
     """
     p[0] = p.slice[1:]
 
@@ -354,6 +410,26 @@ def p_comma_commands(p):
     """
     p[0] = p.slice[1:]
 
+def p_if_header(p):
+    "if_header : IF LBE expr RBE"
+    p[0] = p.slice[1:]
+
+def p_if(p):
+    """ if : if_header LB commands RB
+           | if_header command
+           | if_header LB commands RB ELSE if
+           | if_header command ELSE if
+           | if_header LB commands RB ELSE else
+           | if_header command ELSE else
+    """
+    p[0] = p.slice[1:]
+
+def p_else(p):
+    """ else : LB commands RB
+             | command
+    """
+    p[0] = p.slice[1:]
+
 if False:
     # XXX: I do not know, why this does not work
     for k, v in tuple(globals().items()):
@@ -389,6 +465,7 @@ if __name__ == "__main__":
 
     text.tag_config("keyword", foreground = "#FF0000")
     text.tag_config("int", foreground = "#00AAFF")
+    text.tag_config("char", foreground = "#00AAFF")
     text.tag_config("string", foreground = "#AA8800")
 
     sb = Scrollbar(root)
