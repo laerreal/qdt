@@ -490,7 +490,16 @@ if __name__ == "__main__":
 
         for t in iter_tokens(res):
             if t.prefix:
-                text.insert(END, t.prefix, "ignored")
+                content = ""
+                for c in t.prefix:
+                    if c == " ":
+                        content += u"\u00B7"
+                    elif c == "\t":
+                        content += u"\u00BB   "
+                    else:
+                        content += c
+
+                text.insert(END, content, "ignored")
 
             tags = []
             try:
