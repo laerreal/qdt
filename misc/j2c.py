@@ -32,7 +32,7 @@ with pypath("..ply"):
 
 
 for kw in ["package", "class", "extends", "public", "return", "true", "false",
-    "new", "for", "static", "final", "if", "else"
+    "new", "for", "static", "final", "if", "else", "import", "try", "catch"
 ]:
     exec("""\
 def t_%s(t):
@@ -48,6 +48,11 @@ def t_WORD(t):
 def t_INTEGER(t):
     "[0-9]+"
     t.tag = "int"
+    return t
+
+def t_FLOAT(t):
+    "([.][0-9]+)|([0-9]+[.])|([0-9]+[.][0-9]+)"
+    t.tag = "float"
     return t
 
 def t_INC(t):
@@ -86,6 +91,17 @@ t_NOT = r'~'
 
 t_LOR = r'\|\|'
 t_LAND = r'&&'
+
+t_TIMESEQUAL = r'\*='
+t_DIVEQUAL = r'/='
+t_MODEQUAL = r'%='
+t_PLUSEQUAL = r'\+='
+t_MINUSEQUAL = r'-='
+t_LSHIFTEQUAL = r'<<='
+t_RSHIFTEQUAL = r'>>='
+t_ANDEQUAL = r'&='
+t_OREQUAL = r'\|='
+t_XOREQUAL = r'\^='
 
 def t_ASSIGN(t):
     "="
@@ -165,11 +181,21 @@ def t_error(t):
     raise RuntimeError(t)
 
 def p_module(p):
-    "module : package class_def"
+    "module : package imports class_def"
     p[0] = p.slice[1:]
 
 def p_package(p):
     "package : PACKAGE dot_expr SC"
+    p[0] = p.slice[1:]
+
+def p_import(p):
+    "import : IMPORT dot_expr SC"
+    p[0] = p.slice[1:]
+
+def p_imports(p):
+    """ imports :
+                | imports import
+    """
     p[0] = p.slice[1:]
 
 def p_dot_expr(p):
@@ -189,6 +215,7 @@ def p_methods_def(p):
                     | methods_def constructor_def
                     | methods_def method_def
                     | methods_def field_def
+                    | methods_def fields_def
     """
     p[0] = p.slice[1:]
 
@@ -206,6 +233,23 @@ def p_field_def(p):
     "field_def : def_spec var_decl SC"
     p[0] = p.slice[1:]
 
+def p_fields_def(p):
+    """ fields_def : def_spec WORD vars_def SC
+    """
+    p[0] = p.slice[1:]
+
+def p_vars_def(p):
+    """ vars_def : var_def
+                 | vars_def COMMA var_def
+    """
+    p[0] = p.slice[1:]
+
+def p_var_def(p):
+    """ var_def : WORD
+                | WORD ASSIGN expr
+    """
+    p[0] = p.slice[1:]
+
 def p_storage(p):
     """ storage :
                 | FINAL
@@ -220,8 +264,7 @@ def p_access(p):
     p[0] = p.slice[1:]
 
 def p_def_spec(p):
-    """ def_spec : access storage
-                 | storage access
+    """ def_spec : storage access storage
     """
     p[0] = p.slice[1:]
 
@@ -245,6 +288,7 @@ def p_commands(p):
 def p_command(p):
     """ command : for
                 | if
+                | try
                 | var_decl SC
                 | call SC
                 | return SC
@@ -267,7 +311,23 @@ def p_return(p):
     p[0] = p.slice[1:]
 
 def p_assign(p):
-    "assign : lval ASSIGN expr"
+    """ assign : lval ASSIGN expr
+               | lval assign_op expr
+    """
+    p[0] = p.slice[1:]
+
+def p_assign_op(p):
+    """ assign_op : TIMESEQUAL
+                  | DIVEQUAL
+                  | MODEQUAL
+                  | PLUSEQUAL
+                  | MINUSEQUAL
+                  | LSHIFTEQUAL
+                  | RSHIFTEQUAL
+                  | ANDEQUAL
+                  | OREQUAL
+                  | XOREQUAL
+    """
     p[0] = p.slice[1:]
 
 def p_lval(p):
@@ -304,6 +364,8 @@ def p_expr(p):
              | CHAR
              | unary_noside
              | expr logical expr
+             | FLOAT
+             | expr DOT call
     """
     p[0] = p.slice[1:]
 
@@ -430,6 +492,11 @@ def p_else(p):
     """
     p[0] = p.slice[1:]
 
+def p_try(p):
+    """ try : TRY LB commands RB CATCH LBE WORD WORD RBE LB commands RB
+    """
+    p[0] = p.slice[1:]
+
 # DEBUG
 
 for k, v in tuple(globals().items()):
@@ -469,6 +536,7 @@ if __name__ == "__main__":
 
     text.tag_config("keyword", foreground = "#FF0000")
     text.tag_config("int", foreground = "#00AAFF")
+    text.tag_config("float", foreground = "#00AAFF")
     text.tag_config("char", foreground = "#00AAFF")
     text.tag_config("string", foreground = "#AA8800")
 
@@ -479,9 +547,10 @@ if __name__ == "__main__":
     text.config(yscrollcommand = sb.set)
 
     for fn in [
-        "ADCElm.java",
-        "ACRailElm.java",
-        "RailElm.java",
+        #"ADCElm.java",
+        #"ACRailElm.java",
+        #"RailElm.java",
+        "VoltageElm.java",
     ]:
         FULL = join(ROOT_DIR, fn)
         with open(FULL, "r") as f:
