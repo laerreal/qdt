@@ -430,19 +430,23 @@ def p_else(p):
     """
     p[0] = p.slice[1:]
 
-if False:
-    # XXX: I do not know, why this does not work
-    for k, v in tuple(globals().items()):
-        if k[:2] != "p_":
-            continue
+# DEBUG
 
+for k, v in tuple(globals().items()):
+    if k[:2] != "p_":
+        continue
+
+    # assert ("rest",) == v(("", "rest"))
+
+    if False:
+        # XXX: I do not know, why this does not work
         globals().pop(k)
 
         code = """\
 def %s(p):
-    \"""%s\"""
-    p[0] = p.slice[1:]
-    """ % (k, v.__doc__)
+\"""%s\"""
+p[0] = p.slice[1:]
+""" % (k, v.__doc__)
 
         print(code)
         exec(code)
@@ -477,6 +481,7 @@ if __name__ == "__main__":
     for fn in [
         "ADCElm.java",
         "ACRailElm.java",
+        "RailElm.java",
     ]:
         FULL = join(ROOT_DIR, fn)
         with open(FULL, "r") as f:
