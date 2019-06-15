@@ -1,4 +1,5 @@
 from common import (
+    ee,
     pypath
 )
 from os.path import (
@@ -523,7 +524,7 @@ p_error = t_error
 lexer = lex()
 parser = yacc()
 
-ROOT_DIR = "/home/real/me/circuit/circuitjs/src/src/com/lushprojects/circuitjs1/client"
+ROOT_DIR = ee("J2C_INPUT_ROOT")
 
 if __name__ == "__main__":
     root = Tk()
