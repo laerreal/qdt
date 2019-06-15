@@ -1,4 +1,5 @@
 from common import (
+    Persistent,
     ee,
     pypath
 )
@@ -6,9 +7,7 @@ from os.path import (
     join
 )
 from six.moves.tkinter import (
-    Y,
-    LEFT,
-    BOTH,
+    HORIZONTAL,
     END,
     Tk,
     Text,
@@ -529,8 +528,13 @@ ROOT_DIR = ee("J2C_INPUT_ROOT")
 if __name__ == "__main__":
     root = Tk()
 
-    text = Text(root, font = ("Courier", 10, NORMAL))
-    text.pack(fill = BOTH, expand = True, side = LEFT)
+    root.rowconfigure(0, weight = 1)
+    root.rowconfigure(1, weight = 0)
+    root.columnconfigure(0, weight = 1)
+    root.columnconfigure(1, weight = 0)
+
+    text = Text(root, font = ("Courier", 10, NORMAL), wrap = "none")
+    text.grid(row = 0, column = 0, sticky = "NESW")
 
     font_ignored = ("Courier", 10, ITALIC)
     text.tag_config("ignored", font = font_ignored, foreground = "#AAAAAA")
@@ -541,11 +545,17 @@ if __name__ == "__main__":
     text.tag_config("char", foreground = "#00AAFF")
     text.tag_config("string", foreground = "#AA8800")
 
-    sb = Scrollbar(root)
-    sb.pack(fill = Y, expand = True)
+    sbv = Scrollbar(root)
+    sbv.grid(row = 0, column = 1, sticky = "NESW")
 
-    sb.config(command = text.yview)
-    text.config(yscrollcommand = sb.set)
+    sbh = Scrollbar(root, orient = HORIZONTAL)
+    sbh.grid(row = 1, column = 0, sticky = "NESW")
+
+    sbv.config(command = text.yview)
+    text.config(yscrollcommand = sbv.set)
+
+    sbh.config(command = text.xview)
+    text.config(xscrollcommand = sbh.set)
 
     for fn in [
         #"ADCElm.java",
@@ -586,4 +596,19 @@ if __name__ == "__main__":
 
         text.insert(END, "\n\n")
 
-    root.mainloop()
+    with Persistent(".J2C-GUI-settings.py",
+        geometry = "650x900"
+    ) as cfg:
+
+        def set_geom():
+            root.geometry(cfg.geometry)
+
+        root.after(10, set_geom)
+
+        def on_destroy(_):
+            # ignore screen offset
+            cfg.geometry = root.geometry().split("+", 1)[0]
+
+        root.bind("<Destroy>", on_destroy, "+")
+
+        root.mainloop()
