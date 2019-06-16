@@ -30,10 +30,14 @@ with pypath("..ply"):
         iter_tokens
     )
 
+def t_COMMENT_ML(t):
+    "/[*](.|\\n|\\r)*?[*]/"
+    t.lexer.lineno += t.value.count('\n') + t.value.count('\r')
 
 for kw in ["package", "class", "extends", "public", "return", "true", "false",
     "new", "for", "static", "final", "if", "else", "import", "try", "catch",
-    "switch", "case", "break", "default", "instanceof"
+    "switch", "case", "break", "default", "instanceof", "abstract", "private",
+    "implements", "throw", "while"
 ]:
     exec("""\
 def t_%s(t):
@@ -47,12 +51,12 @@ def t_WORD(t):
     return t
 
 def t_INTEGER(t):
-    "[0-9]+(?=[^.])"
+    "[0-9]+(?=[^.e])"
     t.tag = "int"
     return t
 
 def t_FLOAT(t):
-    "(([0-9]+[.][0-9]+)|([.][0-9]+)|([0-9]+[.]))(e[0-9]+)?"
+    "(([0-9]+[.][0-9]+)|([.][0-9]+)|([0-9]+[.]?))(e-?[0-9]+)?"
     t.tag = "float"
     return t
 
@@ -143,10 +147,6 @@ def t_DOT(t):
 def t_COMMENT_SL(t):
     "//.*"
 
-def t_COMMENT_ML(t):
-    "/[*](.|\\n|\\r)*[*]/"
-    t.lexer.lineno += t.value.count('\n') +  t.value.count('\r')
-
 def t_SPACE(t):
     "[ \\t]"
 
@@ -200,14 +200,41 @@ def p_imports(p):
     p[0] = p.slice[1:]
 
 def p_dot_expr(p):
-    """ dot_expr : WORD
-                 | dot_expr DOT dot_expr
+    """ dot_expr : dot_expr DOT WORD
+                 | WORD DOT WORD
                  | dot_expr DOT CLASS
+                 | WORD DOT CLASS
     """
     p[0] = p.slice[1:]
 
 def p_class_def(p):
-    """ class_def : CLASS WORD EXTENDS WORD LB methods_def RB
+    """ class_def : class_spec CLASS WORD inheritance LB methods_def RB
+    """
+    p[0] = p.slice[1:]
+
+def p_parent(p):
+    """ parent : EXTENDS WORD
+    """
+    p[0] = p.slice[1:]
+
+def p_interfaces(p):
+    """ interfaces : IMPLEMENTS WORD
+                   | interfaces COMMA WORD
+    """
+    p[0] = p.slice[1:]
+
+def p_inheritance(p):
+    """ inheritance : parent
+                    | parent interfaces
+                    | interfaces parent
+                    | interfaces
+    """
+    p[0] = p.slice[1:]
+
+def p_class_spec(p):
+    """ class_spec : access
+                   | ABSTRACT access
+                   | access ABSTRACT
     """
     p[0] = p.slice[1:]
 
@@ -226,7 +253,13 @@ def p_constructor_def(p):
     p[0] = p.slice[1:]
 
 def p_method_def(p):
-    """ method_def : def_spec WORD WORD LBE args_def RBE LB commands RB
+    """ method_def : def_spec type_spec WORD LBE args_def RBE LB commands RB
+    """
+    p[0] = p.slice[1:]
+
+def p_type_spec(p):
+    """ type_spec : WORD
+                  | WORD LBT RBT
     """
     p[0] = p.slice[1:]
 
@@ -235,19 +268,20 @@ def p_field_def(p):
     p[0] = p.slice[1:]
 
 def p_fields_def(p):
-    """ fields_def : def_spec WORD vars_def SC
+    """ fields_def : def_spec type_spec vars_def SC
     """
     p[0] = p.slice[1:]
 
 def p_vars_def(p):
     """ vars_def : var_def
+                 | var_def ASSIGN expr
                  | vars_def COMMA var_def
     """
     p[0] = p.slice[1:]
 
 def p_var_def(p):
     """ var_def : WORD
-                | WORD ASSIGN expr
+                | WORD LBT RBT
     """
     p[0] = p.slice[1:]
 
@@ -261,6 +295,7 @@ def p_storage(p):
 def p_access(p):
     """ access :
                | PUBLIC
+               | PRIVATE
     """
     p[0] = p.slice[1:]
 
@@ -277,8 +312,7 @@ def p_args_def(p):
     p[0] = p.slice[1:]
 
 def p_arg_def(p):
-    """ arg_def : WORD WORD
-                | WORD WORD LBT RBT
+    """ arg_def : type_spec var_def
     """
     p[0] = p.slice[1:]
 
@@ -299,7 +333,13 @@ def p_command(p):
                 | break SC
                 | switch
                 | SC
+                | throw SC
+                | while
     """
+    p[0] = p.slice[1:]
+
+def p_throw(p):
+    "throw : THROW expr"
     p[0] = p.slice[1:]
 
 
@@ -310,15 +350,21 @@ def p_break(p):
 def p_var_decl(p):
     """ var_decl : arg_def
                  | arg_def ASSIGN expr
+                 | var_decl COMMA var_def
     """
     p[0] = p.slice[1:]
 
 def p_call(p):
-    "call : dot_expr LBE args_val RBE"
+    """ call : dot_expr LBE args_val RBE
+             | WORD LBE args_val RBE
+    """
     p[0] = p.slice[1:]
 
 def p_return(p):
-    "return : RETURN expr"
+    """ return : RETURN
+               | RETURN expr
+               | RETURN LBE WORD RBE
+    """
     p[0] = p.slice[1:]
 
 def p_assign(p):
@@ -345,6 +391,7 @@ def p_lval(p):
     """ lval : dot_expr
              | array_item
              | lval DOT WORD
+             | WORD
     """
     p[0] = p.slice[1:]
 
@@ -357,8 +404,7 @@ def p_new_array(p):
     p[0] = p.slice[1:]
 
 def p_expr(p):
-    """ expr : dot_expr
-             | INTEGER
+    """ expr : INTEGER
              | bool_val
              | STRING
              | ternary
@@ -370,13 +416,14 @@ def p_expr(p):
              | unary
              | LBE expr RBE
              | expr bitwise expr
-             | array_item
              | cast
              | CHAR
              | unary_noside
              | expr logical expr
              | FLOAT
              | expr DOT call
+             | assign
+             | lval
     """
     p[0] = p.slice[1:]
 
@@ -491,8 +538,6 @@ def p_if_header(p):
 def p_if(p):
     """ if : if_header LB commands RB
            | if_header command
-           | if_header LB commands RB ELSE if
-           | if_header command ELSE if
            | if_header LB commands RB ELSE else
            | if_header command ELSE else
     """
@@ -538,6 +583,17 @@ def p_default(p):
     """ default : DEFAULT COLON commands
                 | DEFAULT COLON LB commands RB
     """
+    p[0] = p.slice[1:]
+
+
+def p_while(p):
+    """ while : while_header LB commands RB
+              | while_header command
+    """
+    p[0] = p.slice[1:]
+
+def p_while_header(p):
+    "while_header : WHILE LBE expr RBE"
     p[0] = p.slice[1:]
 
 # DEBUG
