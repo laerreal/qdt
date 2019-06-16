@@ -738,10 +738,11 @@ if __name__ == "__main__":
     iid2line = {}
 
     for fn in [
-        #"ADCElm.java",
-        #"ACRailElm.java",
-        #"RailElm.java",
+        "ADCElm.java",
+        "ACRailElm.java",
+        "RailElm.java",
         "VoltageElm.java",
+        "CircuitElm.java",
     ]:
         FULL = join(ROOT_DIR, fn)
         with open(FULL, "r") as f:
