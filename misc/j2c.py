@@ -568,18 +568,43 @@ parser = yacc()
 
 ROOT_DIR = ee("J2C_INPUT_ROOT")
 
+def decorate_ignored(c):
+    if c == " ":
+        return u"\u00B7"
+    elif c == "\t":
+        return u"\u00BB   "
+    elif c == "\n":
+        return "\u2193\n"
+    elif c == "\r":
+        return "\u2190\n"
+    else:
+        return c
+
+
 if __name__ == "__main__":
     root = Tk()
 
     root.rowconfigure(0, weight = 1)
     root.rowconfigure(1, weight = 0)
-    root.columnconfigure(0, weight = 1)
-    root.columnconfigure(1, weight = 0)
+    root.columnconfigure(0, weight = 0)
+    root.columnconfigure(1, weight = 1)
+    root.columnconfigure(2, weight = 0)
 
-    text = Text(root, font = ("Courier", 10, NORMAL), wrap = "none")
-    text.grid(row = 0, column = 0, sticky = "NESW")
+    main_font = ("Courier", 10, NORMAL)
 
-    font_ignored = ("Courier", 10, ITALIC)
+    # line numbers
+    ln = Text(root,
+        font = main_font,
+        wrap = "none",
+        background = "#BBBBBB",
+        width = 4
+    )
+    ln.grid(row = 0, column = 0, sticky = "NESW")
+
+    text = Text(root, font = main_font, wrap = "none")
+    text.grid(row = 0, column = 1, sticky = "NESW")
+
+    font_ignored = ("Courier", 10, NORMAL) # , ITALIC)
     text.tag_config("ignored", font = font_ignored, foreground = "#AAAAAA")
 
     text.tag_config("keyword", foreground = "#FF0000")
@@ -589,16 +614,38 @@ if __name__ == "__main__":
     text.tag_config("string", foreground = "#AA8800")
 
     sbv = Scrollbar(root)
-    sbv.grid(row = 0, column = 1, sticky = "NESW")
+    sbv.grid(row = 0, column = 2, sticky = "NESW")
 
     sbh = Scrollbar(root, orient = HORIZONTAL)
-    sbh.grid(row = 1, column = 0, sticky = "NESW")
+    sbh.grid(row = 1, column = 0, sticky = "NESW", columnspan = 2)
 
-    sbv.config(command = text.yview)
-    text.config(yscrollcommand = sbv.set)
+    # https://stackoverflow.com/questions/32038701/python-tkinter-making-two-text-widgets-scrolling-synchronize
+    def yview(*a):
+        text.yview(*a)
+        ln.yview(*a)
 
-    sbh.config(command = text.xview)
+    sbv.config(command = yview)
+
+    def text_yset(*a):
+        sbv.set(*a)
+        ln.yview("moveto", a[0])
+
+    text.config(yscrollcommand = text_yset)
+
+    def ln_yset(*a):
+        sbv.set(*a)
+        text.yview("moveto", a[0])
+
+    ln.config(yscrollcommand = ln_yset)
+
+    def xview(*a):
+        text.xview(*a)
+        ln.xview(*a)
+
+    sbh.config(command = xview)
     text.config(xscrollcommand = sbh.set)
+
+    prev_lineno = 0
 
     for fn in [
         #"ADCElm.java",
@@ -609,7 +656,9 @@ if __name__ == "__main__":
         FULL = join(ROOT_DIR, fn)
         with open(FULL, "r") as f:
             code = f.read()
+
         try:
+            lexer.lineno = 1
             res = parser.parse(code, lexer = lexer, debug = False)
         except:
             lexer.lineno = 1
@@ -617,15 +666,17 @@ if __name__ == "__main__":
             res = None
 
         for t in iter_tokens(res):
+            if prev_lineno > t.lineno:
+                prev_lineno = 0
+
+            while prev_lineno < t.lineno:
+                prev_lineno += 1
+                ln.insert(END, "%d\n" % prev_lineno)
+
             if t.prefix:
                 content = ""
                 for c in t.prefix:
-                    if c == " ":
-                        content += u"\u00B7"
-                    elif c == "\t":
-                        content += u"\u00BB   "
-                    else:
-                        content += c
+                    content += decorate_ignored(c)
 
                 text.insert(END, content, "ignored")
 
@@ -637,7 +688,14 @@ if __name__ == "__main__":
 
             text.insert(END, t.value, *tags)
 
+        for c in lexer.ignored:
+            text.insert(END, decorate_ignored(c), "ignored")
+            if c in "\r\n":
+                prev_lineno += 1
+                ln.insert(END, "%d\n" % prev_lineno)
+
         text.insert(END, "\n\n")
+        ln.insert(END, "\n")
 
     with Persistent(".J2C-GUI-settings.py",
         geometry = "650x900"
