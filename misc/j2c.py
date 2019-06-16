@@ -32,7 +32,8 @@ with pypath("..ply"):
 
 
 for kw in ["package", "class", "extends", "public", "return", "true", "false",
-    "new", "for", "static", "final", "if", "else", "import", "try", "catch"
+    "new", "for", "static", "final", "if", "else", "import", "try", "catch",
+    "switch", "case", "break", "default", "instanceof"
 ]:
     exec("""\
 def t_%s(t):
@@ -46,12 +47,12 @@ def t_WORD(t):
     return t
 
 def t_INTEGER(t):
-    "[0-9]+"
+    "[0-9]+(?=[^.])"
     t.tag = "int"
     return t
 
 def t_FLOAT(t):
-    "([.][0-9]+)|([0-9]+[.])|([0-9]+[.][0-9]+)"
+    "(([0-9]+[.][0-9]+)|([.][0-9]+)|([0-9]+[.]))(e[0-9]+)?"
     t.tag = "float"
     return t
 
@@ -276,7 +277,9 @@ def p_args_def(p):
     p[0] = p.slice[1:]
 
 def p_arg_def(p):
-    "arg_def : WORD WORD"
+    """ arg_def : WORD WORD
+                | WORD WORD LBT RBT
+    """
     p[0] = p.slice[1:]
 
 def p_commands(p):
@@ -293,7 +296,15 @@ def p_command(p):
                 | call SC
                 | return SC
                 | assign SC
+                | break SC
+                | switch
+                | SC
     """
+    p[0] = p.slice[1:]
+
+
+def p_break(p):
+    "break : BREAK"
     p[0] = p.slice[1:]
 
 def p_var_decl(p):
@@ -331,7 +342,7 @@ def p_assign_op(p):
     p[0] = p.slice[1:]
 
 def p_lval(p):
-    """ lval : WORD
+    """ lval : dot_expr
              | array_item
              | lval DOT WORD
     """
@@ -409,6 +420,7 @@ def p_cmp(p):
             | GE
             | EQ
             | NE
+            | INSTANCEOF
     """
     p[0] = p.slice[1:]
 
@@ -494,6 +506,37 @@ def p_else(p):
 
 def p_try(p):
     """ try : TRY LB commands RB CATCH LBE WORD WORD RBE LB commands RB
+    """
+    p[0] = p.slice[1:]
+
+def p_switch(p):
+    """ switch : SWITCH LBE expr RBE LB cases RB
+    """
+    p[0] = p.slice[1:]
+
+def p_cases(p):
+    """ cases : case
+              | default
+              | cases cases
+    """
+    p[0] = p.slice[1:]
+
+def p_case(p):
+    """ case : CASE case_const COLON commands
+             | CASE case_const COLON LB commands RB
+    """
+    p[0] = p.slice[1:]
+
+def p_case_const(p):
+    """ case_const : INTEGER
+                   | FLOAT
+                   | WORD
+    """
+    p[0] = p.slice[1:]
+
+def p_default(p):
+    """ default : DEFAULT COLON commands
+                | DEFAULT COLON LB commands RB
     """
     p[0] = p.slice[1:]
 
