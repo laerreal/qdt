@@ -7,11 +7,17 @@ from os.path import (
     join
 )
 from six.moves.tkinter import (
+    Toplevel,
+    SEL,
+    CURRENT,
     HORIZONTAL,
     END,
     Tk,
     Text,
     Scrollbar
+)
+from six.moves.tkinter_ttk import (
+    Treeview
 )
 from six.moves.tkinter_font import (
     NORMAL,
@@ -20,9 +26,11 @@ from six.moves.tkinter_font import (
 
 with pypath("..ply"):
     from ply.yacc import (
+        YaccSymbol,
         yacc
     )
     from ply.lex import (
+        LexToken,
         join as join_tokens,
         lex
     )
@@ -701,7 +709,33 @@ if __name__ == "__main__":
     sbh.config(command = xview)
     text.config(xscrollcommand = sbh.set)
 
+    tree_window = Toplevel(root)
+
+    tree_window.rowconfigure(0, weight = 1)
+    tree_window.rowconfigure(1, weight = 0)
+    tree_window.columnconfigure(0, weight = 1)
+    tree_window.columnconfigure(1, weight = 0)
+
+    stree = Treeview(tree_window)
+    # stree.column("#0", stretch = True, width = 800)
+    stree.grid(row = 0, column = 0, sticky = "NESW")
+
+    sbv2 = Scrollbar(tree_window)
+    sbv2.grid(row = 0, column = 1, sticky = "NESW")
+
+    sbh2 = Scrollbar(tree_window, orient = HORIZONTAL)
+    sbh2.grid(row = 1, column = 0, sticky = "NESW")
+
+    sbv2.config(command = stree.yview)
+    stree.config(yscrollcommand = sbv2.set)
+
+    sbh2.config(command = stree.xview)
+    stree.config(xscrollcommand = sbh2.set)
+
+    file_lineno = 0
     prev_lineno = 0
+
+    iid2line = {}
 
     for fn in [
         #"ADCElm.java",
@@ -723,6 +757,7 @@ if __name__ == "__main__":
 
         for t in iter_tokens(res):
             if prev_lineno > t.lineno:
+                file_lineno += prev_lineno
                 prev_lineno = 0
 
             while prev_lineno < t.lineno:
@@ -753,19 +788,112 @@ if __name__ == "__main__":
         text.insert(END, "\n\n")
         ln.insert(END, "\n")
 
+        # Build syntax tree
+        sroot_iid = stree.insert("", END, text = fn, open = True)
+
+        stack = [(sroot_iid, res)]
+
+        while stack:
+            cur_iid, symbols = stack.pop()
+
+            if isinstance(symbols, list):
+                for s in symbols:
+                    stack.append((cur_iid, s))
+                continue
+
+            if isinstance(symbols, LexToken):
+                s_iid = stree.insert(cur_iid, 0,
+                    text = str(symbols.value),
+                    open = True
+                )
+
+                lineno = symbols.lineno + file_lineno
+                iid2line[s_iid] = lineno
+
+                _iid = stree.parent(s_iid)
+                while _iid:
+                    if _iid not in iid2line:
+                        iid2line[_iid] = lineno
+                    _iid = stree.parent(_iid)
+
+            if isinstance(symbols, (YaccSymbol)):
+                s_iid = stree.insert(cur_iid, 0,
+                    text = str(symbols),
+                    open = True
+                )
+                stack.append((s_iid, symbols.value))
+
+        # because of text.insert(END, "\n\n") below
+        file_lineno += 1
+
+    def on_stree_select(_):
+        try:
+            sel = stree.selection()[0]
+        except:
+            return
+        try:
+            lineno = iid2line[sel]
+        except KeyError:
+            return
+
+        # print(lineno)
+        start, end = "%d.0" % lineno, "%d.end" % lineno
+        text.see("%d.0" % lineno)
+        text.tag_remove(SEL, "1.0", END)
+        text.tag_add(SEL, start, end)
+        text.focus_force()
+
+    stree.bind("<<TreeviewSelect>>", on_stree_select, "+")
+
+    line2iid = {}
+    for iid, line in iid2line.items():
+        line2iid.setdefault(line, iid)
+
+    def on_b1(e):
+        line, _ = text.index("@%d,%d" % (e.x, e.y)).split(".")
+        try:
+            line_n = int(line)
+        except ValueError:
+            return
+        try:
+            iid = line2iid[line_n]
+        except KeyError:
+            return
+        stree.see(iid)
+        stree.selection_set(iid)
+
+    text.bind("<Button-1>", on_b1, "+")
+
     with Persistent(".J2C-GUI-settings.py",
-        geometry = "650x900"
+        tree_geometry = (650, 900),
+        tree_offset = (650, 0),
+        geometry = (650, 900)
     ) as cfg:
 
         def set_geom():
-            root.geometry(cfg.geometry)
+            root.geometry("%dx%d" % cfg.geometry)
+            x = root.winfo_x() + cfg.tree_offset[0]
+            y = root.winfo_y() + cfg.tree_offset[1]
+            tree_window.geometry("%dx%d+%d+%d" % (cfg.tree_geometry + (x, y)))
 
         root.after(10, set_geom)
 
-        def on_destroy(_):
+        def on_destroy_root(_):
             # ignore screen offset
-            cfg.geometry = root.geometry().split("+", 1)[0]
+            cfg.geometry = root.winfo_width(), root.winfo_height()
 
-        root.bind("<Destroy>", on_destroy, "+")
+        root.bind("<Destroy>", on_destroy_root, "+")
+
+        def on_destroy_tree(_):
+            # ignore screen offset
+            cfg.tree_geometry = (
+                tree_window.winfo_width(), tree_window.winfo_height()
+            )
+            cfg.tree_offset = (
+                tree_window.winfo_x() - root.winfo_x(),
+                tree_window.winfo_y() - root.winfo_y(),
+            )
+
+        tree_window.bind("<Destroy>", on_destroy_tree, "+")
 
         root.mainloop()
