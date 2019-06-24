@@ -240,7 +240,6 @@ def p_methods_def(p):
     """ methods_def :
                     | methods_def constructor_def
                     | methods_def method_def
-                    | methods_def field_def
                     | methods_def fields_def
     """
 
@@ -257,9 +256,6 @@ def p_type_spec(p):
                   | WORD LBT RBT
     """
 
-def p_field_def(p):
-    "field_def : def_spec var_decl SC"
-
 def p_fields_def(p):
     """ fields_def : def_spec type_spec vars_def SC
     """
@@ -267,7 +263,7 @@ def p_fields_def(p):
 def p_vars_def(p):
     """ vars_def : var_def
                  | var_def ASSIGN expr
-                 | vars_def COMMA var_def
+                 | vars_def COMMA vars_def
     """
 
 def p_var_def(p):
