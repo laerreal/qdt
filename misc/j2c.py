@@ -191,21 +191,17 @@ def t_error(t):
 
 def p_module(p):
     "module : package imports class_def"
-    p[0] = p.slice[1:]
 
 def p_package(p):
     "package : PACKAGE dot_expr SC"
-    p[0] = p.slice[1:]
 
 def p_import(p):
     "import : IMPORT dot_expr SC"
-    p[0] = p.slice[1:]
 
 def p_imports(p):
     """ imports :
                 | imports import
     """
-    p[0] = p.slice[1:]
 
 def p_dot_expr(p):
     """ dot_expr : dot_expr DOT WORD
@@ -213,23 +209,19 @@ def p_dot_expr(p):
                  | dot_expr DOT CLASS
                  | WORD DOT CLASS
     """
-    p[0] = p.slice[1:]
 
 def p_class_def(p):
     """ class_def : class_spec CLASS WORD inheritance LB methods_def RB
     """
-    p[0] = p.slice[1:]
 
 def p_parent(p):
     """ parent : EXTENDS WORD
     """
-    p[0] = p.slice[1:]
 
 def p_interfaces(p):
     """ interfaces : IMPLEMENTS WORD
                    | interfaces COMMA WORD
     """
-    p[0] = p.slice[1:]
 
 def p_inheritance(p):
     """ inheritance : parent
@@ -237,14 +229,12 @@ def p_inheritance(p):
                     | interfaces parent
                     | interfaces
     """
-    p[0] = p.slice[1:]
 
 def p_class_spec(p):
     """ class_spec : access
                    | ABSTRACT access
                    | access ABSTRACT
     """
-    p[0] = p.slice[1:]
 
 def p_methods_def(p):
     """ methods_def :
@@ -253,82 +243,68 @@ def p_methods_def(p):
                     | methods_def field_def
                     | methods_def fields_def
     """
-    p[0] = p.slice[1:]
 
 def p_constructor_def(p):
     """ constructor_def : def_spec WORD LBE args_def RBE LB commands RB
     """
-    p[0] = p.slice[1:]
 
 def p_method_def(p):
     """ method_def : def_spec type_spec WORD LBE args_def RBE LB commands RB
     """
-    p[0] = p.slice[1:]
 
 def p_type_spec(p):
     """ type_spec : WORD
                   | WORD LBT RBT
     """
-    p[0] = p.slice[1:]
 
 def p_field_def(p):
     "field_def : def_spec var_decl SC"
-    p[0] = p.slice[1:]
 
 def p_fields_def(p):
     """ fields_def : def_spec type_spec vars_def SC
     """
-    p[0] = p.slice[1:]
 
 def p_vars_def(p):
     """ vars_def : var_def
                  | var_def ASSIGN expr
                  | vars_def COMMA var_def
     """
-    p[0] = p.slice[1:]
 
 def p_var_def(p):
     """ var_def : WORD
                 | WORD LBT RBT
     """
-    p[0] = p.slice[1:]
 
 def p_storage(p):
     """ storage :
                 | FINAL
                 | STATIC
     """
-    p[0] = p.slice[1:]
 
 def p_access(p):
     """ access :
                | PUBLIC
                | PRIVATE
     """
-    p[0] = p.slice[1:]
 
 def p_def_spec(p):
     """ def_spec : storage access storage
     """
-    p[0] = p.slice[1:]
 
 def p_args_def(p):
     """ args_def :
                  | arg_def
                  | args_def COMMA arg_def
     """
-    p[0] = p.slice[1:]
 
 def p_arg_def(p):
     """ arg_def : type_spec var_def
     """
-    p[0] = p.slice[1:]
 
 def p_commands(p):
     """ commands :
                  | commands command
     """
-    p[0] = p.slice[1:]
 
 def p_command(p):
     """ command : for
@@ -344,42 +320,35 @@ def p_command(p):
                 | throw SC
                 | while
     """
-    p[0] = p.slice[1:]
 
 def p_throw(p):
     "throw : THROW expr"
-    p[0] = p.slice[1:]
 
 
 def p_break(p):
     "break : BREAK"
-    p[0] = p.slice[1:]
 
 def p_var_decl(p):
     """ var_decl : arg_def
                  | arg_def ASSIGN expr
                  | var_decl COMMA var_def
     """
-    p[0] = p.slice[1:]
 
 def p_call(p):
     """ call : dot_expr LBE args_val RBE
              | WORD LBE args_val RBE
     """
-    p[0] = p.slice[1:]
 
 def p_return(p):
     """ return : RETURN
                | RETURN expr
                | RETURN LBE WORD RBE
     """
-    p[0] = p.slice[1:]
 
 def p_assign(p):
     """ assign : lval ASSIGN expr
                | lval assign_op expr
     """
-    p[0] = p.slice[1:]
 
 def p_assign_op(p):
     """ assign_op : TIMESEQUAL
@@ -393,7 +362,6 @@ def p_assign_op(p):
                   | OREQUAL
                   | XOREQUAL
     """
-    p[0] = p.slice[1:]
 
 def p_lval(p):
     """ lval : dot_expr
@@ -401,15 +369,12 @@ def p_lval(p):
              | lval DOT WORD
              | WORD
     """
-    p[0] = p.slice[1:]
 
 def p_new(p):
     "new : NEW WORD LBE args_val RBE"
-    p[0] = p.slice[1:]
 
 def p_new_array(p):
     "new_array : NEW WORD LBT expr RBT"
-    p[0] = p.slice[1:]
 
 def p_expr(p):
     """ expr : INTEGER
@@ -433,40 +398,33 @@ def p_expr(p):
              | assign
              | lval
     """
-    p[0] = p.slice[1:]
 
 def p_unary_noside(p):
     """ unary_noside : MINUS expr
                      | NOT expr
                      | LNOT expr
     """
-    p[0] = p.slice[1:]
 
 def p_unary(p):
     """ unary : WORD un_op
               | un_op WORD
     """
-    p[0] = p.slice[1:]
 
 def p_un_op(p):
     """ un_op : INC
               | DEC
     """
-    p[0] = p.slice[1:]
 
 def p_array_item(p):
     """ array_item : WORD LBT expr RBT
     """
-    p[0] = p.slice[1:]
 
 def p_ternary(p):
     """ ternary : expr CONDOP expr COLON expr
     """
-    p[0] = p.slice[1:]
 
 def p_cast(p):
     "cast : LBE WORD RBE expr"
-    p[0] = p.slice[1:]
 
 def p_cmp(p):
     """ cmp : LT
@@ -477,7 +435,6 @@ def p_cmp(p):
             | NE
             | INSTANCEOF
     """
-    p[0] = p.slice[1:]
 
 def p_arithm(p):
     """ arithm : PLUS
@@ -486,7 +443,6 @@ def p_arithm(p):
                | DIVIDE
                | MOD
     """
-    p[0] = p.slice[1:]
 
 def p_bitwise(p):
     """ bitwise : OR
@@ -495,41 +451,34 @@ def p_bitwise(p):
                 | LSHIFT
                 | RSHIFT
     """
-    p[0] = p.slice[1:]
 
 def p_logical(p):
     """ logical : LOR
                 | LAND
     """
-    p[0] = p.slice[1:]
 
 def p_bool_val(p):
     """ bool_val : TRUE
                  | FALSE
     """
-    p[0] = p.slice[1:]
 
 def p_args_val(p):
     """ args_val :
                  | arg_val
                  | args_val COMMA args_val
     """
-    p[0] = p.slice[1:]
 
 def p_arg_val(p):
     """ arg_val : expr
     """
-    p[0] = p.slice[1:]
 
 def p_for(p):
     """ for : for_header LB commands RB
             | for_header command
     """
-    p[0] = p.slice[1:]
 
 def p_for_header(p):
     "for_header : FOR LBE comma_commands SC expr SC comma_commands RBE"
-    p[0] = p.slice[1:]
 
 def p_comma_commands(p):
     """ comma_commands :
@@ -537,11 +486,9 @@ def p_comma_commands(p):
                        | unary
                        | comma_commands COMMA comma_commands
     """
-    p[0] = p.slice[1:]
 
 def p_if_header(p):
     "if_header : IF LBE expr RBE"
-    p[0] = p.slice[1:]
 
 def p_if(p):
     """ if : if_header LB commands RB
@@ -549,81 +496,77 @@ def p_if(p):
            | if_header LB commands RB ELSE else
            | if_header command ELSE else
     """
-    p[0] = p.slice[1:]
 
 def p_else(p):
     """ else : LB commands RB
              | command
     """
-    p[0] = p.slice[1:]
 
 def p_try(p):
     """ try : TRY LB commands RB CATCH LBE WORD WORD RBE LB commands RB
     """
-    p[0] = p.slice[1:]
 
 def p_switch(p):
     """ switch : SWITCH LBE expr RBE LB cases RB
     """
-    p[0] = p.slice[1:]
 
 def p_cases(p):
     """ cases : case
               | default
               | cases cases
     """
-    p[0] = p.slice[1:]
 
 def p_case(p):
     """ case : CASE case_const COLON commands
              | CASE case_const COLON LB commands RB
     """
-    p[0] = p.slice[1:]
 
 def p_case_const(p):
     """ case_const : INTEGER
                    | FLOAT
                    | WORD
     """
-    p[0] = p.slice[1:]
 
 def p_default(p):
     """ default : DEFAULT COLON commands
                 | DEFAULT COLON LB commands RB
     """
-    p[0] = p.slice[1:]
 
 
 def p_while(p):
     """ while : while_header LB commands RB
               | while_header command
     """
-    p[0] = p.slice[1:]
 
 def p_while_header(p):
     "while_header : WHILE LBE expr RBE"
+
+# Grammar post-processing
+
+glob_snapshot = dict(globals())
+
+def unify_rule(p_func):
+    line = getattr(p_func, "co_firstlineno", p_func.__code__.co_firstlineno)
+    code = "\n" * (line - 1) + """\
+def _{p_func}(p):
+    \"""{rule}\"""
+    {p_func}(p)
     p[0] = p.slice[1:]
+""".format(
+        p_func = p_func.__name__,
+        rule = p_func.__doc__
+    )
+    return exec(code, glob_snapshot)
 
-# DEBUG
-
-for k, v in tuple(globals().items()):
-    if k[:2] != "p_":
+for k, v in tuple(glob_snapshot.items()):
+    if k[:2] != "p_" or k == "p_error":
         continue
 
     # assert ("rest",) == v(("", "rest"))
 
-    if False:
-        # XXX: I do not know, why this does not work
-        globals().pop(k)
+    unify_rule(v)
 
-        code = """\
-def %s(p):
-\"""%s\"""
-p[0] = p.slice[1:]
-""" % (k, v.__doc__)
-
-        print(code)
-        exec(code)
+    globals()[k] = glob_snapshot["_" + k]
 
 p_error = t_error
 
