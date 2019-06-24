@@ -697,7 +697,7 @@ if __name__ == "__main__":
         except:
             lexer.lineno = 1
             parser.parse(code, lexer = lexer, debug = True)
-            res = None
+            continue
 
         for t in iter_tokens(res):
             if prev_lineno > t.lineno:
