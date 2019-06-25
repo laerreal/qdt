@@ -23,7 +23,16 @@ from six.moves.tkinter_font import (
     NORMAL,
     ITALIC
 )
-
+from traceback import (
+    print_exc
+)
+from inspect import (
+    getmro
+)
+#from types import (
+#    FunctionType,
+#    MethodType
+#)
 with pypath("..ply"):
     from ply.yacc import (
         YaccSymbol,
@@ -53,6 +62,10 @@ def t_%s(t):
     t.tag = "keyword"
     return t
     """ % (kw.upper(), kw))
+
+def bind(func, *a, **kw):
+    ret = lambda *_a, **_kw : func(*(a + _a), **(kw.update(_kw) or kw))
+    return ret
 
 def t_WORD(t):
     "[a-zA-Z][_a-zA-Z0-9]*"
@@ -189,8 +202,24 @@ tokens = tuple(k[2:] for k in globals() if k[:2] == "t_")
 def t_error(t):
     raise RuntimeError(t)
 
+class J(object):
+
+    def __init__(self, subtree):
+        self.subtree = subtree
+
+    def __getitem__(self, i):
+        return self.subtree[i]
+
+
+class JModule(J):
+
+    def get_class(self):
+        return self[2].value
+
+
 def p_module(p):
     "module : package imports class_def"
+    return JModule
 
 def p_package(p):
     "package : PACKAGE dot_expr SC"
@@ -210,9 +239,25 @@ def p_dot_expr(p):
                  | WORD DOT CLASS
     """
 
+class JClass(J):
+
+    def get_name(self):
+        return self[2].value
+
+    def iter_items(self):
+        chain = self[5].value # methods_def
+        while chain:
+            chain, item = chain
+            yield item.value
+            chain = chain.value
+
+    def get_items(self):
+        return tuple(self.iter_items())
+
 def p_class_def(p):
     """ class_def : class_spec CLASS WORD inheritance LB methods_def RB
     """
+    return JClass
 
 def p_parent(p):
     """ parent : EXTENDS WORD
@@ -243,18 +288,35 @@ def p_methods_def(p):
                     | methods_def fields_def
     """
 
+def JConstructor(J):
+
+    def get_name(self):
+        return self[1].value
+
 def p_constructor_def(p):
     """ constructor_def : def_spec WORD LBE args_def RBE LB commands RB
     """
+    return JConstructor
+
+def JMethod(J):
+
+    def get_name(self):
+        return self[2].value
 
 def p_method_def(p):
     """ method_def : def_spec type_spec WORD LBE args_def RBE LB commands RB
     """
+    return JMethod
 
 def p_type_spec(p):
     """ type_spec : WORD
                   | WORD LBT RBT
     """
+
+class JField(J):
+
+    def get_name(self):
+        return self[2]
 
 def p_fields_def(p):
     """ fields_def : def_spec type_spec vars_def SC
@@ -539,6 +601,19 @@ def p_while_header(p):
 
 # Grammar post-processing
 
+class list_ex(list):
+    pass
+
+def proxify(proxy, source):
+    for cls in getmro(type(source)):
+        if cls is object:
+            break
+
+        for n in cls.__dict__:
+            if n.startswith("_"):
+                continue
+            setattr(proxy, n, getattr(source, n))
+
 glob_snapshot = dict(globals())
 
 def unify_rule(p_func):
@@ -546,8 +621,11 @@ def unify_rule(p_func):
     code = "\n" * (line - 1) + """\
 def _{p_func}(p):
     \"""{rule}\"""
-    {p_func}(p)
-    p[0] = p.slice[1:]
+    handler = {p_func}(p)
+    res = list_ex(p.slice[1:])
+    if handler is not None:
+        proxify(res, handler(res))
+    p[0] = res
 """.format(
         p_func = p_func.__name__,
         rule = p_func.__doc__
@@ -691,9 +769,15 @@ if __name__ == "__main__":
             lexer.lineno = 1
             res = parser.parse(code, lexer = lexer, debug = False)
         except:
+            print_exc()
             lexer.lineno = 1
             parser.parse(code, lexer = lexer, debug = True)
             continue
+
+        cls = res.get_class()
+        print(cls.get_name())
+        for item in cls.get_items():
+            print(item)
 
         for t in iter_tokens(res):
             if prev_lineno > t.lineno:
