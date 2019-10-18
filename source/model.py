@@ -1131,12 +1131,12 @@ class Structure(Type):
 
         if self.declaration is None:
             struct_begin = StructureTypedefDeclarationBegin(self, indent)
-            struct_end = StructureTypedefDeclarationEnd(self, fields_indent,
+            struct_end = StructureTypedefDeclarationEnd(self,
                 indent, True
             )
         else:
             struct_begin = StructureDeclarationBegin(self, indent)
-            struct_end = StructureDeclarationEnd(self, fields_indent,
+            struct_end = StructureDeclarationEnd(self,
                 indent, True
             )
 
@@ -2370,7 +2370,6 @@ class StructureTypedefDeclarationEnd(SourceChunk):
     weight = 2
 
     def __init__(self, struct,
-        fields_indent = "    ",
         indent = "",
         append_nl = True
     ):
@@ -2404,7 +2403,6 @@ class StructureDeclarationEnd(SourceChunk):
     weight = 2
 
     def __init__(self, struct,
-        fields_indent = "    ",
         indent = "",
         append_nl = True
     ):
