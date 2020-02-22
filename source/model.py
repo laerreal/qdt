@@ -93,6 +93,7 @@ with pypath("..ply"):
     exec("from ply.cpp import t_" + ", t_".join(tokens))
 
 from six import (
+    integer_types,
     add_metaclass,
     string_types,
     text_type,
@@ -107,6 +108,9 @@ from .tools import (
 )
 from collections import (
     deque
+)
+from .c_const import (
+    CINT
 )
 
 
@@ -1296,22 +1300,35 @@ class Structure(Type):
             return "{ 0 };" # zero structure initializer by default
 
         code = init.code
-        if not isinstance(code, dict):
+        if isinstance(code, dict):
+            # Use entries of given dict to initialize fields. Field name is
+            # used as entry key.
+
+            fields_code = []
+            for name in self.fields:
+                try:
+                    val_str = init[name]
+                except KeyError:  # no initializer for this field
+                    continue
+                fields_code.append("    .%s@b=@s%s" % (name, val_str))
+
+            return "{\n" + ",\n".join(fields_code) + "\n}";
+        elif isinstance(code, (list, tuple)):
+            # if user gives values in a simple iterable, we assumes she wants
+            # `struct` initialization without filed names.
+            fields_code = []
+
+            for idx, _ in enumerate(self.fields):
+                try:
+                    val_str = init[idx]
+                except IndexError:  # no initializers left
+                    break
+                fields_code.append(val_str)
+
+            return "{" + ",@s".join(fields_code) + "}";
+        else:
             # Support for legacy initializers
             return code
-
-        # Use entries of given dict to initialize fields. Field name is used
-        # as entry key.
-
-        fields_code = []
-        for name in self.fields.keys():
-            try:
-                val_str = init[name]
-            except KeyError: # no initializer for this field
-                continue
-            fields_code.append("    .%s@b=@s%s" % (name, val_str))
-
-        return "{\n" + ",\n".join(fields_code) + "\n}";
 
     @property
     def fields(self):
@@ -1944,18 +1961,45 @@ class ForwardDeclarator(TypeReferencesVisitor):
             self.replace(decl)
 
 
+initializing_container = (dict, list, tuple)
+
 class Initializer(object):
 
     # code is string for variables and dictionary for macros
     def __init__(self, code, used_types = [], used_variables = []):
-        self.code = code
         self.used_types = set(used_types)
+        used_variables = set(used_variables)
         self.used_variables = used_variables
-        if isinstance(code, dict):
+        if isinstance(code, initializing_container):
             self.__type_references__ = self.__type_references__ + ["code"]
+
+            # wrap inner containers into initializers
+            if isinstance(code, (list, tuple)):
+                code = type(code)(
+                    (Initializer(el) if \
+                        isinstance(el, initializing_container) \
+                        else el) \
+                            for el in code
+                )
+            elif isinstance(code, dict):
+                code = type(code)(
+                    (key,
+                     (Initializer(el) \
+                         if isinstance(el, initializing_container) \
+                         else el)
+                    ) for key, el in code.items()
+                )
 
             # automatically get types used in the code
             self.used_types.update(TypesCollector(code).visit().used_types)
+            self.used_variables.update(
+                GlobalsCollector(code).visit().used_globals
+            )
+
+        for var in used_variables:
+            var.used = True
+
+        self.code = code
 
     def __getitem__(self, key):
         val = self.code[key]
@@ -1965,6 +2009,10 @@ class Initializer(object):
             val_str = val
         elif isinstance(val, Type):
             val_str = val.c_name
+        elif isinstance(val, integer_types):
+            val_str = CINT(val).gen_c_code()
+        elif isinstance(val, Variable):
+            val_str = val.name
         else:
             raise TypeError("Unsupported initializer entry type '%s'"
                 % type(val).__name__
@@ -1986,6 +2034,12 @@ class Variable(object):
     ):
         self.name = name
         self.type = _type if isinstance(_type, Type) else Type[_type]
+
+        # auto wrap initializer
+        if initializer is not None \
+        and not isinstance(initializer, Initializer):
+            initializer = Initializer(initializer)
+
         self.initializer = initializer
         self.static = static
         self.const = const
@@ -2513,6 +2567,13 @@ class VariableDefinition(SourceChunk):
         append_nl = True,
         separ = ";"
     ):
+        if var.array_size is None:
+            init_generator = gen_init_string
+        else:
+            init_generator = gen_init_array_string
+
+        init = var.initializer
+
         super(VariableDefinition, self).__init__(var,
             "Variable %s of type %s definition" % (var, var.type),
             """\
@@ -2521,12 +2582,12 @@ class VariableDefinition(SourceChunk):
     indent = indent,
     var_declaration = var.declaration_string,
     used = "" if var.used else "@b__attribute__((unused))",
-    init = gen_init_string(var.type, var.initializer, indent),
+    init = "" if init is None \
+              else "@b=@b" + init_generator(var.type, init, indent),
     separ = separ,
     nl = "\n" if append_nl else ""
             )
         )
-
 
 class StructureForwardDeclaration(SourceChunk):
 
@@ -2646,6 +2707,7 @@ class EnumerationElementDeclaration(SourceChunk):
         indent = "",
         separ = ","
     ):
+        init = elem.initializer
         super(EnumerationElementDeclaration, self).__init__(elem,
             "Enumeration element %s declaration" % elem,
             """\
@@ -2653,7 +2715,8 @@ class EnumerationElementDeclaration(SourceChunk):
 """.format(
     indent = indent,
     name = elem.c_name,
-    init = gen_init_string(elem, elem.initializer, indent),
+    init = "" if init is None \
+              else "@b=@b" + gen_init_string(elem, init, indent),
     separ = separ
             )
         )
@@ -2692,15 +2755,23 @@ def gen_function_declaration_string(indent, function,
 
 
 def gen_init_string(type, initializer, indent):
-    init_code = ""
-    if initializer is not None:
-        raw_code = type.gen_usage_string(initializer)
-        # add indent to initializer code
-        init_code_lines = raw_code.split('\n')
-        init_code = "@b=@b" + init_code_lines[0]
-        for line in init_code_lines[1:]:
-            init_code += "\n" + indent + line
+    raw_code = type.gen_usage_string(initializer)
+    # add indent to initializer code
+    init_code_lines = raw_code.split('\n')
+    init_code = init_code_lines[0]
+    for line in init_code_lines[1:]:
+        init_code += "\n" + indent + line
     return init_code
+
+
+def gen_init_array_string(type_, initializer, indent):
+    extra_indent = indent + "    "
+    element_inits = list(
+        gen_init_string(type_, el_init, extra_indent) for el_init in
+            initializer.code # it must be an iterable of `Initializer`s
+    )
+    separator = ",\n" + extra_indent
+    return "{\n" + extra_indent + separator.join(element_inits) + "\n}"
 
 
 def gen_function_decl_ref_chunks(function, generator):
