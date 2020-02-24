@@ -25,14 +25,77 @@ from source import *
 from common import (
     get_cleaner
 )
+from subprocess import (
+    Popen
+)
 
 
 def main():
-    # module generation is based on
-    # https://docs.python.org/3/extending/extending.html
-
     add_base_types()
 
+    misc_dir = dirname(__file__)
+    build_dir = join(misc_dir, "sandbox_build")
+    build_tmp = mkdtemp()
+
+    # generate payload
+    Windows_h = Header("Windows.h", is_global = True)
+    Windows_h.add_types([
+        Macro("HWND"),
+        Macro("LPCTSTR"),
+        Macro("UINT"),
+        Macro("DWORD"),
+        Macro("LPVOID"),
+        Macro("HMODULE"),
+        # https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-messagebox
+        Function("MessageBox", # in winuser.h actually
+            ret_type = Type["int"],
+            args = (
+                Type["HWND"]("hWnd"),
+                Type["LPCTSTR"]("lpText"),
+                Type["LPCTSTR"]("lpCaption"),
+                Type["UINT"]("uType")
+            )
+        )
+    ])
+
+    payload_c = Source("payload.c", locked = False)
+    payload_c.add_types([
+        Function("main",
+            ret_type = Type["int"],
+            args = [
+                Type["int"]("argc"),
+                Pointer(Pointer(Type["const char"]))("argv")
+            ],
+            body = BodyTree()(
+                Call("MessageBox",
+                    hWnd = 0,
+                    lpText = "Hello!",
+                    lpCaption = "Payload",
+                    uType = 0
+                ),
+                Return(0),
+            )
+        )
+    ])
+
+    payload_c_path = join(build_dir, payload_c.path)
+    payload_exe_path = join(build_dir, "payload.exe")
+    testdll_path = join(build_dir, "TestDLL.dll")
+
+    with open(payload_c_path, "w") as writer:
+        payload_c.generate().generate(writer)
+
+    print("Start payload building")
+    gcc = Popen(["gcc", "-luser32", "-o", payload_exe_path, payload_c_path])
+    assert gcc.wait() == 0
+    print("Payload built")
+
+    # test executable
+    # payload = Popen([payload_exe_path])
+    # assert payload.wait() == 0
+
+    # module generation is based on
+    # https://docs.python.org/3/extending/extending.html
     Python_h = Header("Python.h", is_global = True)
     # XXX: some types are defined as macros for simplicity but it can be wrong.
     Python_h.add_types([
@@ -61,7 +124,7 @@ def main():
         Macro("PyModuleDef_HEAD_INIT"),
         Macro("PyMODINIT_FUNC"),
         Function("PyModule_Create",
-            args = (Pointer(Type["struct PyModuleDef"])("def"))
+            args = [Pointer(Type["struct PyModuleDef"])("def")]
         )
     ])
 
@@ -69,13 +132,85 @@ def main():
     pyobjptr = Pointer(Type["PyObject"])
     NULL = Type["NULL"]
 
+    # PE loader
+    Loader_h = Header("SimplePELoader/Loader/Loader.h").add_types([
+        Function("LOADER_FNVIRTUALALLOC"),
+        Function("LOADER_FNVIRTUALFREE"),
+        Function("LOADER_FNGETPROCADDRESS"),
+        Function("LOADER_FNLOADLIBRARYA"),
+        Structure("LOADER_FUNCTION_TABLE",
+            Type["LOADER_FNVIRTUALALLOC"]("fnVirtualAlloc"),
+            Type["LOADER_FNVIRTUALFREE"]("fnVirtualFree"),
+            Type["LOADER_FNGETPROCADDRESS"]("fnGetProcAddress"),
+            Type["LOADER_FNLOADLIBRARYA"]("fnLoadLibraryA"),
+        ),
+        Structure("LOADED_MODULE",
+            Pointer(Type["void"])("entry"),
+            # TODO: no all fields
+        )
+    ])
+    Loader_h.add_types([
+        Function("Loader_LoadFromBuffer",
+            ret_type = Type["DWORD"],
+            args = (
+                Pointer(Type["LOADER_FUNCTION_TABLE"])("pFunTable"), # CONST
+                Type["LPVOID"]("pBuffer"), # CONST
+                Type["DWORD"]("cbBuffer"),
+                Pointer(Type["LOADED_MODULE"])("pResult"),
+            )
+        )
+    ])
+
     # actual sandbox
     sandbox_c = Source("sandbox.c", locked = False)
+
+    load_and_run = Function("load_and_run",
+        args = [Pointer(Type["const char"])("file_name")],
+        body = """\
+    LOADER_FUNCTION_TABLE funTab = { 0 };
+
+    funTab.fnGetProcAddress = &GetProcAddress;
+    funTab.fnLoadLibraryA = &LoadLibraryA;
+    funTab.fnVirtualAlloc = &VirtualAlloc;
+    funTab.fnVirtualFree = &VirtualFree;
+
+    LOADED_MODULE loadedModule = { 0 };
+
+    FILE *f = fopen(file_name, "rb+");
+    if (!f) {
+        printf("File opening failed\\n");
+        return;
+    }
+    fseek(f, 0, SEEK_END);
+    long fsize = ftell(f);
+    printf("File size %lu\\n", fsize);
+    if (!fsize) {
+        fclose(f);
+        return;
+    }
+    fseek(f, 0, SEEK_SET);
+    void *buf = malloc(fsize);
+    if (fread(buf, 1, fsize, f) != fsize) {
+        free(buf);
+        fclose(f);
+        printf("fread failed\\n");
+        return;
+    }
+    fclose(f);
+    int res = Loader_LoadFromBuffer(&funTab, buf, fsize, &loadedModule);
+    printf("loading result %d\\n", res);
+    loadedModule.pEntryPoint(loadedModule.hModule, DLL_PROCESS_ATTACH, NULL);
+    free(buf);
+"""     ,
+        used_types = [Type["Loader_LoadFromBuffer"], Type["FILE"]]
+    )
+
     sandbox_c.add_types([
         Function(
             name = "sandbox_run",
             body = BodyTree()(
-                Call("printf", "Hello from sandbox!\\n"),
+                Call("printf", "Hello from sandbox!\n"),
+                Call(load_and_run, testdll_path), # payload_exe_path),
                 MCall("Py_INCREF", "Py_None"),
                 Return(Type["Py_None"]),
             ),
@@ -117,18 +252,16 @@ def main():
     ))
 
     modules = [sandbox_c]
-    paths = []
+    paths = [join(misc_dir, "SimplePELoader", "Loader", "Loader.cpp")]
     # TODO: outline this
     for m in modules:
         f = m.generate()
-        with open(m.path, "w") as writer:
+        m_path = join(build_dir, m.path)
+        with open(m_path, "w") as writer:
             f.generate(writer)
-        paths.append(m.path)
+        paths.append(m_path)
 
     # Building sandbox
-
-    build_dir = join(dirname(__file__), "sandbox_build")
-    build_tmp = mkdtemp()
 
     # TODO: get_cleaner().rmtree(build_tmp) # for Windows Cleaner does not work
 
@@ -150,6 +283,10 @@ def main():
             __file__,
             build_tmp
         ),
+        include_dirs = (
+            __file__,
+            [misc_dir]
+        )
     )
 
     # comment from weave.build_tools.build_extension
