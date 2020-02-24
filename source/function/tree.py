@@ -485,15 +485,32 @@ class Break(SemicolonPresence):
         super(Break, self).__init__(val = "break")
 
 
+class undefined: pass
+
+
 class Call(SemicolonPresence):
 
-    def __init__(self, func, *args):
+    def __init__(self, func, *args, **kw):
         if isinstance(func, str):
             func = Type[func]
         elif not isinstance(func, (Variable, Function, CNode)):
             raise ValueError(
                 "Invalid type of func in Call: " + type(func).__name__
             )
+
+        # Get values of arguments for the `func`tion from our keyword
+        # argument values (if the `function` has arguments info).
+        if isinstance(func, Function) and func.args:
+            args = list(args)
+            for arg in func.args[len(args):]:
+                val = kw.get(arg.name, undefined)
+                if val is undefined:
+                    raise RuntimeError("Function %s is not given a value of"
+                        " argument %s" % (func, arg)
+                    )
+                args.append(val)
+
+            args = tuple(args)
 
         super(Call, self).__init__(children = (func,) + args)
 
