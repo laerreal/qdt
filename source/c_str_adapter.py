@@ -27,20 +27,26 @@ def t_QUOTES(t):
     t.value = '\\"'
     return t
 
+# escape slashes
+def t_SLASH(t):
+    r"\\"
+    t.value = "\\\\"
+    return t
+
 # split string onto two parts and add safe breaking space between
 def t_WINDOWS_NEWLINE(t):
     r"\r\n"
-    t.value = r'\\r\\n"@s"'
+    t.value = r'\r\n"@s"'
     return t
 
 def t_MAC_NEWLINE(t):
     r"\r"
-    t.value = r'\\r"@s"'
+    t.value = r'\r"@s"'
     return t
 
 def t_LINUX_NEWLINE(t):
     r"\n"
-    t.value = r'\\n"@s"'
+    t.value = r'\n"@s"'
     return t
 
 
