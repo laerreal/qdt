@@ -10,3 +10,6 @@
 [submodule "pyrsp"]
 	path = pyrsp
 	url = https://github.com/stef/pyrsp.git
+[submodule "misc/SimplePELoader"]
+	path = misc/SimplePELoader
+	url = https://github.com/laerreal/SimplePELoader.git
