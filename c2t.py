@@ -465,7 +465,6 @@ def target_tests_run(tests_queue, port_queue, res_queue, is_finish, reuse,
                     session.kill()
                     qemu.join()
                     session.port_close()
-                res_queue.put(("target", None, "TEST_EXIT"))
                 break
             continue
         else:
@@ -513,6 +512,7 @@ def target_tests_run(tests_queue, port_queue, res_queue, is_finish, reuse,
                     qemu.join()
                     session.port_close()
 
+    res_queue.put(("target", None, "TEST_EXIT"))
 
 class FreePortFinder(Process):
 
