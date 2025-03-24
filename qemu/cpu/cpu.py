@@ -1337,6 +1337,8 @@ class CPUType(QOMCPU):
 @descriptionOf(CPUType)
 class CPUDescription(QOMDescription):
 
+    gen_order = -1
+
     def co_gen(self, *a, **kw):
         yield self.gen_type().co_gen(*a, **kw)
 
